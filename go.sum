@@ -1,2 +1,4 @@
 github.com/barelyhuman/go v0.2.2 h1:Lpk1XrlP40F3II8BibVzViZUOJ1GgDdzXUBb8ENwb0U=
 github.com/barelyhuman/go v0.2.2/go.mod h1:hox2iDYZAarjpS7jKQeYIi2F+qMA8KLMtCws++L2sSY=
+github.com/mattn/go-sqlite3 v1.14.27 h1:drZCnuvf37yPfs95E5jd9s3XhdVWLal+6BOK6qrv6IU=
+github.com/mattn/go-sqlite3 v1.14.27/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=

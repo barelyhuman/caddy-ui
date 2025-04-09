@@ -1,1 +1,11 @@
+# macOS
+.DS_Store
+
+# air
 /tmp
+
+# possible databases
+/*.sqlite3
+
+# the app itself
+/caddy-ui

@@ -9,14 +9,14 @@ services:
     environment:
       CADDY_ADMIN: "0.0.0.0:2019"
 
-  ui:
-    depends_on:
-      - caddy
-    links:
-      - caddy
-    build:
-      context: .
-    environment:
-      CADDY_URL: http://caddy:2019
-    ports:
-      - "8081:8081"
+  # ui:
+  #   depends_on:
+  #     - caddy
+  #   links:
+  #     - caddy
+  #   build:
+  #     context: .
+  #   environment:
+  #     CADDY_URL: http://caddy:2019
+  #   ports:
+  #     - "8081:8081"

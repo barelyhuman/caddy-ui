@@ -2,12 +2,18 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+
+	"github.com/barelyhuman/caddy-ui/migrate"
+	"github.com/barelyhuman/caddy-ui/views"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/barelyhuman/go/env"
 )
@@ -17,92 +23,18 @@ func getCaddyURL(path string) (string, error) {
 	return url.JoinPath(baseURL, path)
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func configEditorHandler(w http.ResponseWriter, r *http.Request) {
 	// Set the Content-Type header to "text/html"
 	w.Header().Set("Content-Type", "text/html")
 	// HTML response with a basic code editor implemented using a textarea and JavaScript's fetch API
-	html := `<html>
-    <head>
-        <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20">
-        <style>
-            body {
-                margin: 20px;
-                font-family: Arial, sans-serif;
-            }
-            #editor {
-                width: 100%;
-                height: 400px;
-                border: 1px solid #ccc;
-                font-family: monospace;
-                font-size: 14px;
-                padding: 10px;
-                box-sizing: border-box;
-            }
-            button {
-                margin: 5px;
-                padding: 10px 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Config Editor</h1>
-        <textarea id="editor"></textarea>
-        <br/>
-        <button onclick="fetchConfig()">Fetch Config</button>
-        <button onclick="uploadConfig()">Save Config</button>
-        <script>
-            // Automatically fetch config on page load
-            document.addEventListener('DOMContentLoaded', fetchConfig);
+	views.Render(w, "ConfigEditor", nil)
+}
 
-            function fetchConfig() {
-                fetch('/fetch-config')
-                    .then(async response => {
-                        try{
-                            if(!response.ok){
-                                const res = await response.json()
-                                 if (res.error) {
-                                 alert(res.error)
-                    }
-                                return {}
-                            }
-                            return await response.json()
-                        }catch(err){
-                            return {}
-                        }
-                    })
-                    .then(data => {
-                        document.getElementById('editor').value = JSON.stringify(data, null, 2);
-                    })
-                    .catch(err => console.error('Error fetching config:', err));
-            }
-
-            function uploadConfig() {
-                const configText = document.getElementById('editor').value;
-
-                fetch('/upload-config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: configText
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                    } else {
-                        alert('Config saved successfully!');
-                    }
-                })
-                .catch(err => alert('Error uploading config: ' + err));
-            }
-        </script>
-    </body>
-</html>`
-	_, err := w.Write([]byte(html))
-	if err != nil {
-		log.Println("Error writing response:", err)
-	}
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	// Set the Content-Type header to "text/html"
+	w.Header().Set("Content-Type", "text/html")
+	// HTML response with a basic code editor implemented using a textarea and JavaScript's fetch API
+	views.Render(w, "Home", nil)
 }
 
 type ResponseError struct {
@@ -198,12 +130,27 @@ func uploadConfigHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", handler)
-	http.HandleFunc("/fetch-config", fetchConfigHandler)
-	http.HandleFunc("/upload-config", uploadConfigHandler)
+	db, err := sql.Open("sqlite3", "./data.sqlite3")
+	if err != nil {
+		log.Fatal("Failed to open database")
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal("Failed to connect to database")
+	}
+
+	migrate.MigrateUp(db, "./migrate")
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/config-editor", configEditorHandler)
+	mux.HandleFunc("/fetch-config", fetchConfigHandler)
+	mux.HandleFunc("/upload-config", uploadConfigHandler)
 
 	log.Println("Listening on :8081")
-	if err := http.ListenAndServe(":8081", nil); err != nil {
-		log.Fatal("ListenAndServe:", err)
+	if err := http.ListenAndServe(":8081", mux); err != nil {
+		log.Fatal("Failed to start server:", err)
 	}
 }
