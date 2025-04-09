@@ -7,13 +7,13 @@ import (
 	"log"
 )
 
-//go:embed **/*.html
+//go:embed **/*.html **/**/*.html
 var viewFS embed.FS
 
 var views *template.Template
 
 func init() {
-	_views, err := template.ParseFS(viewFS, "./**/*.html")
+	_views, err := template.ParseFS(viewFS, "./**/*.html", "**/**/*.html")
 	if err != nil {
 		log.Fatalf("Failed to read templates with error: %v", err)
 	}
