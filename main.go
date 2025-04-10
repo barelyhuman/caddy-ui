@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/barelyhuman/caddy-ui/migrate"
 	"github.com/barelyhuman/caddy-ui/views"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -139,7 +140,7 @@ func main() {
 		log.Fatal("Failed to connect to database")
 	}
 
-	// migrate.MigrateUp(db, "./migrate")
+	migrate.MigrateUp(db, "./migrate")
 
 	mux := http.NewServeMux()
 
