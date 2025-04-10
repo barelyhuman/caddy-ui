@@ -9,3 +9,7 @@
 
 # the app itself
 /caddy-ui
+
+# env
+*.env
+!.env.example

@@ -1,0 +1,21 @@
+{{define "AppsHome" }}
+<html>
+  <head>
+    <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
+  </head>
+  <body>
+    <r-grid columns="8">
+      <r-cell span="2">
+        <header>
+         {{template "AppNav" .}}
+        </header>
+      </r-cell>
+      <r-cell span="6">
+        <div>
+          <h3>Apps</h3>
+        </div>
+      </r-cell>
+    </r-grid>
+  </body>
+</html>
+{{end}}

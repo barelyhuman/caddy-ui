@@ -2,16 +2,16 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 
+	"github.com/barelyhuman/caddy-ui/data"
 	"github.com/barelyhuman/caddy-ui/migrate"
 	"github.com/barelyhuman/caddy-ui/views"
+	"github.com/joho/godotenv"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -24,17 +24,18 @@ func getCaddyURL(path string) (string, error) {
 }
 
 func configEditorHandler(w http.ResponseWriter, r *http.Request) {
-	// Set the Content-Type header to "text/html"
 	w.Header().Set("Content-Type", "text/html")
-	// HTML response with a basic code editor implemented using a textarea and JavaScript's fetch API
 	views.Render(w, "ConfigEditor", nil)
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	// Set the Content-Type header to "text/html"
 	w.Header().Set("Content-Type", "text/html")
-	// HTML response with a basic code editor implemented using a textarea and JavaScript's fetch API
 	views.Render(w, "Home", nil)
+}
+
+func appsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	views.Render(w, "AppsHome", nil)
 }
 
 type ResponseError struct {
@@ -60,7 +61,6 @@ func fetchConfigHandler(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, json)
 		return
 	}
-	fmt.Printf("url: %v\n", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -130,9 +130,11 @@ func uploadConfigHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	db, err := sql.Open("sqlite3", "./data.sqlite3")
+	godotenv.Load()
+
+	db, err := data.GetDatabaseHandle()
 	if err != nil {
-		log.Fatal("Failed to open database")
+		log.Fatalf("Failed to open database with error: %v", err)
 	}
 	defer db.Close()
 
@@ -145,7 +147,8 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", homeHandler)
-	mux.HandleFunc("/config-editor", configEditorHandler)
+	mux.HandleFunc("/apps", appsHandler)
+	mux.HandleFunc("/config/editor", configEditorHandler)
 	mux.HandleFunc("/fetch-config", fetchConfigHandler)
 	mux.HandleFunc("/upload-config", uploadConfigHandler)
 
