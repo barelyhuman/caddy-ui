@@ -3,16 +3,6 @@
   <head>
     <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
     <style>
-      :root {
-        --base: #ffffff;
-        --surface: #efefef;
-        --overlay: #adadad;
-
-        --text: #181819;
-        --subtle: #333333;
-        --muted: #555;
-      }
-
       #editor {
         font-family: monospace;
         border: 1px solid var(--surface);
@@ -22,21 +12,8 @@
         width: 100%;
         margin-bottom: 10px;
       }
-
-      button {
-        border: 0px;
-        padding: 4px 12px;
-        border-radius: 6px;
-        background: var(--text);
-        color: var(--base);
-      }
-
-      button:hover{
-        cursor: pointer;
-        background-color: var(--subtle);
-      }
-
     </style>
+    {{template "CommonStyles" .}}
   </head>
   <body>
     <r-grid columns="8">

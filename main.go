@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/barelyhuman/caddy-ui/data"
+	"github.com/barelyhuman/caddy-ui/data/models/apps"
 	"github.com/barelyhuman/caddy-ui/migrate"
 	"github.com/barelyhuman/caddy-ui/views"
 	"github.com/joho/godotenv"
@@ -34,8 +36,57 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appsHandler(w http.ResponseWriter, r *http.Request) {
+	db, err := data.GetDatabaseHandle()
+	if err != nil {
+		log.Printf("failed with error: %v", err)
+	}
 	w.Header().Set("Content-Type", "text/html")
-	views.Render(w, "AppsHome", nil)
+	data, err := apps.FindAll(db)
+	if err != nil {
+		log.Printf("failed with error: %v", err)
+		// throw flash to request
+	}
+
+	if err = views.Render(w, "AppsHome", struct {
+		Apps []apps.AppsWithIdentifier
+	}{
+		Apps: data,
+	}); err != nil {
+		fmt.Fprintf(w, "failed to render page, please try again later")
+		log.Printf("failed with error: %v", err)
+		return
+	}
+}
+
+func appsNewHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "text/html")
+		views.Render(w, "AppsCreate", nil)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		db, _ := data.GetDatabaseHandle()
+		r.ParseForm()
+		appName := r.Form.Get("name")
+		appType := r.Form.Get("type")
+
+		appInstance := apps.New()
+		appInstance.Name = appName
+		appInstance.InstanceID = 1
+		appInstance.Type.Scan(appType)
+
+		if _, err := appInstance.Save(db); err != nil {
+			log.Println(err)
+			http.Redirect(w, r, "/apps/new", http.StatusSeeOther)
+			return
+		}
+
+		http.Redirect(w, r, "/apps", http.StatusSeeOther)
+
+		return
+	}
 }
 
 type ResponseError struct {
@@ -148,6 +199,7 @@ func main() {
 
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/apps", appsHandler)
+	mux.HandleFunc("/apps/new", appsNewHandler)
 	mux.HandleFunc("/config/editor", configEditorHandler)
 	mux.HandleFunc("/fetch-config", fetchConfigHandler)
 	mux.HandleFunc("/upload-config", uploadConfigHandler)

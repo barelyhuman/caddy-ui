@@ -1,0 +1,34 @@
+{{define "AppsCreate"}}
+
+<html>
+  <head>
+    <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
+    {{template "CommonStyles" .}}
+  </head>
+  <body>
+    <r-grid columns="8">
+      <r-cell span="2">
+        <header>{{template "AppNav" .}}</header>
+      </r-cell>
+      <r-cell span="6">
+        <form method="post">
+          <fieldset>
+            <label for="name"> App Name </label>
+            <input id="name" name="name" placeholder="Name" />
+          </fieldset>
+          <fieldset>
+            <label for="type"> Type </label>
+            <select id="type" name="type" placeholder="Type" required>
+              <option selected value="">Select option</option>
+              <option value="reverse-proxy">Reverse Proxy</option>
+              <option value="file-server">File Server</option>
+            </select>
+          </fieldset>
+          <button>Create</button>
+        </form>
+      </r-cell>
+    </r-grid>
+  </body>
+</html>
+
+{{end}}

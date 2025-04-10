@@ -2,18 +2,44 @@
 <html>
   <head>
     <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
+    {{template "CommonStyles" .}}
   </head>
   <body>
     <r-grid columns="8">
       <r-cell span="2">
         <header>
-         {{template "AppNav" .}}
+          {{template "AppNav" .}}
         </header>
       </r-cell>
       <r-cell span="6">
-        <div>
-          <h3>Apps</h3>
-        </div>
+        <r-grid columns="12">
+          <r-cell span="3">
+            <div>
+              <h3>Apps</h3>
+            </div>
+          </r-cell>
+          <r-cell span="12-">
+            <a href="/apps/new" class="button">Add</a>
+          </r-cell>
+          <r-cell span="12">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{ range .Apps }}
+                <tr>
+                  <td>{{.Name}}</td>
+                  <td>{{.Type.String}}</td>
+                </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </r-cell>
+        </r-grid>
       </r-cell>
     </r-grid>
   </body>
