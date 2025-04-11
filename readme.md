@@ -10,8 +10,11 @@ simple prototype for managing caddy with a UI
 
 ### MVP
 
-- [ ] Create Apps
-- [ ] Assign Domains to the apps
+- [x] Apps
+  - [x] Delete
+  - [x] Map Domain
+  - [x] Map Ports
+- [ ] Sync Settings with Caddy
 
 ### Roadmap
 
