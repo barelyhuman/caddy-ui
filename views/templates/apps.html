@@ -1,47 +1,86 @@
 {{define "AppsHome" }}
 <html>
   <head>
-    <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
+    <script src="//unpkg.com/alpinejs" defer></script>
     {{template "CommonStyles" .}}
+    <style>
+      .modal {
+        position: fixed;
+        top: 0px;
+        bottom: 0px;
+        left: 0px;
+        right: 0px;
+        height: 100dvh;
+        width: 100dvw;
+        background: rgba(0, 0, 0, 0.12);
+      }
+      .modal-container {
+        top: 50%;
+        left: 50%;
+        height: auto;
+        max-height: 100dvh;
+        overflow: auto;
+        transform: translate(-50%, -50%);
+        position: absolute;
+      }
+    </style>
   </head>
-  <body>
-    <r-grid columns="8">
-      <r-cell span="2">
-        <header>
-          {{template "AppNav" .}}
-        </header>
-      </r-cell>
-      <r-cell span="6">
-        <r-grid columns="12">
-          <r-cell span="3">
-            <div>
-              <h3>Apps</h3>
-            </div>
-          </r-cell>
-          <r-cell span="12-">
-            <a href="/apps/new" class="button">Add</a>
-          </r-cell>
-          <r-cell span="12">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {{ range .Apps }}
-                <tr>
-                  <td>{{.Name}}</td>
-                  <td>{{.Type.String}}</td>
-                </tr>
-                {{end}}
-              </tbody>
-            </table>
-          </r-cell>
-        </r-grid>
-      </r-cell>
-    </r-grid>
+  <body class="container-fluid">
+    {{template "AppNav" .}}
+
+    <div>
+      <h3>Apps</h3>
+    </div>
+
+    <div class="flex justify-end">
+      <a role="button" href="/apps/new">Add New </a>
+    </div>
+
+    <div class="flex flex-wrap items-start justify-start">
+      {{ range .Apps }}
+      <article class="ml2 mb2 fit" x-data="{showDeleteModal:false}">
+        <p>{{.Name}}</p>
+        <div class="flex ml-auto">
+          <a role="button" href="/apps/{{.ID}}">View</a>
+          <div class="ml2">
+            <button class="outline secondary" x-on:click="showDeleteModal=true">
+              Delete
+            </button>
+            <template x-if="showDeleteModal">
+              <div class="modal">
+                <div class="modal-container">
+                  <div class="modal-body">
+                    <form method="post" action="/apps/{{.ID}}/delete">
+                      <article>
+                        <div>
+                          <p>
+                            Are you sure you wish to delete
+                            <strong>{{.Name}}</strong>?
+                          </p>
+                        </div>
+                        <footer>
+                          <div class="flex items-center">
+                            <input type="submit" value="Delete" class="mr1" />
+                            <input
+                              type="button"
+                              class="secondary"
+                              x-on:click="showDeleteModal=false"
+                              value="Close"
+                            />
+                          </div>
+                        </footer>
+                      </article>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </article>
+
+      {{end}}
+    </div>
   </body>
 </html>
 {{end}}

@@ -1,0 +1,44 @@
+{{define "AppsDetails" }}
+<html>
+  <head>
+    <script src="//unpkg.com/alpinejs" defer></script>
+    {{template "CommonStyles" .}}
+  </head>
+  <body class="container-fluid">
+    {{template "AppNav" .}}
+
+    <article>
+      <header>{{.App.Name}}</header>
+      <div>
+        <p><strong>Type</strong>: {{.App.Type.String}}</p>
+        <p><strong>Exposed Port</strong>: {{.Ports.Port}}</p>
+      </div>
+      <form method="post" action="/apps/{{.App.ID}}/domain">
+        <fieldset>
+          <label>Domain:</label>
+          <div role="group">
+            <input
+              type="text"
+              name="domain"
+              value="{{.PrimaryDomain.Domain}}"
+              required
+            />
+            <button type="submit">Update</button>
+          </div>
+        </fieldset>
+      </form>
+      <footer>
+        <div class="flex justify-end items-center" x-data="{}">
+          <button
+            type="button"
+            class="fit mr2"
+            x-on:click="alert('yet to be implemented sorry')"
+          >
+            Sync
+          </button>
+        </div>
+      </footer>
+    </article>
+  </body>
+</html>
+{{end}}

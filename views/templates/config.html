@@ -1,7 +1,6 @@
 {{define "ConfigEditor"}}
 <html>
   <head>
-    <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
     <style>
       #editor {
         font-family: monospace;
@@ -15,21 +14,18 @@
     </style>
     {{template "CommonStyles" .}}
   </head>
-  <body>
-    <r-grid columns="8">
-      <r-cell span="2">
-        {{template "AppNav" .}}
-      </r-cell>
-      <r-cell span="6">
-        <div>
-          <h3>Config Editor</h3>
-          <textarea id="editor"></textarea>
-          <br />
-          <button id="fetch-cfg-btn">Fetch Config</button>
-          <button id="upload-cfg-btn">Save Config</button>
-        </div>
-      </r-cell>
-    </r-grid>
+  <body class="container-fluid">
+    {{template "AppNav" .}}
+
+    <div>
+      <h3>Config Editor</h3>
+      <button id="fetch-cfg-btn">Fetch Config</button>
+      <button id="upload-cfg-btn">Save Config</button>
+      <div class="mt1">
+        <textarea id="editor"></textarea>
+      </div>
+    </div>
+
     <script type="module">
       const editor = document.querySelector("#editor");
 

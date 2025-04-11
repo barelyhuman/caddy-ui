@@ -6,20 +6,25 @@ import (
 )
 
 type Apps struct {
-	Name       string
-	InstanceID int64
-	Type       sql.NullString
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	Name       string         `db:"apps.name"`
+	InstanceID int64          `db:"apps.instance_id"`
+	Type       sql.NullString `db:"apps.type"`
+	CreatedAt  time.Time      `db:"apps.created_at"`
+	UpdatedAt  time.Time      `db:"apps.updated_at"`
 }
 
 type AppsWithIdentifier struct {
-	ID int64
+	ID int64 `db:"apps.id"`
 	Apps
 }
 
 func New() *Apps {
 	return &Apps{}
+}
+
+func DeleteById(db *sql.DB, id int64) error {
+	_, err := db.Exec("delete from apps where id = ?", id)
+	return err
 }
 
 func FindAll(db *sql.DB) ([]AppsWithIdentifier, error) {
@@ -50,8 +55,33 @@ func FindAll(db *sql.DB) ([]AppsWithIdentifier, error) {
 	return collection, nil
 }
 
-func FindById(db *sql.DB) *AppsWithIdentifier {
-	return &AppsWithIdentifier{}
+func FindById(db *sql.DB, id int64) (*AppsWithIdentifier, error) {
+	var x AppsWithIdentifier
+	res, err := db.Query(`
+		select id,name,instance_id,type,created_at,updated_at from apps
+	`)
+	defer res.Close()
+	if err != nil {
+		return &x, err
+	}
+
+	if res == nil {
+		return &x, nil
+	}
+
+	for res.Next() {
+		res.Scan(
+			&x.ID,
+			&x.Name,
+			&x.InstanceID,
+			&x.Type,
+			&x.CreatedAt,
+			&x.UpdatedAt,
+		)
+		return &x, nil
+	}
+
+	return &x, nil
 }
 
 func (a *Apps) Save(db *sql.DB) (*AppsWithIdentifier, error) {

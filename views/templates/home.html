@@ -1,21 +1,21 @@
 {{define "Home"}}
 <html>
   <head>
-    <link rel="stylesheet" href="https://rsms.me/raster/raster2.css?v=20" />
+    {{template "CommonStyles" .}}
   </head>
-  <body>
-    <r-grid columns="8">
-      <r-cell span="2">
-        <header>
-         {{template "AppNav" .}}
-        </header>
-      </r-cell>
-      <r-cell span="6">
-        <div>
-          <h3>Apps</h3>
-        </div>
-      </r-cell>
-    </r-grid>
+  <body class="container-fluid">
+    {{template "AppNav" .}}
+
+    <section>
+      <h4>Used Ports</h4>
+      {{range $key,$value := .UsedPorts}}
+      <ul>
+        <li>
+          <a href="/apps/{{$key}}">{{$value}}</a>
+        </li>
+      </ul>
+      {{end}}
+    </section>
   </body>
 </html>
 {{end}}

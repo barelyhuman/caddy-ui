@@ -1,0 +1,68 @@
+{
+  "apps": {
+    "http": {
+      "servers": {
+        // srv0, srv1 can be anything but easier to just use the incremented values
+        "srv0": {
+          "listen": [
+            ":443" // if https is required
+          ],
+          "routes": [
+            {
+              "handle": [
+                {
+                  // handler will be a subroute handler if a domain is required
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          // handler of the subroute will be a reverse_proxy
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "0.0.0.0:8081"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  // this defines the matching param
+                  "host": [
+                    // blog.reaper.is, // if both `blog.reaper.is, reaper.is` were added as a matcher
+                    "reaper.is"
+                  ]
+                }
+              ],
+              "terminal": true
+            }
+          ]
+        },
+        "srv1": {
+          "listen": [
+            ":80"
+          ],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "0.0.0.0:8081"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

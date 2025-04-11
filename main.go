@@ -8,9 +8,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/barelyhuman/caddy-ui/data"
+	"github.com/barelyhuman/caddy-ui/data/models/app_ports"
 	"github.com/barelyhuman/caddy-ui/data/models/apps"
+	"github.com/barelyhuman/caddy-ui/data/models/domains"
 	"github.com/barelyhuman/caddy-ui/migrate"
 	"github.com/barelyhuman/caddy-ui/views"
 	"github.com/joho/godotenv"
@@ -30,9 +33,37 @@ func configEditorHandler(w http.ResponseWriter, r *http.Request) {
 	views.Render(w, "ConfigEditor", nil)
 }
 
+func SyncConfigForApp(appId int64) error {
+
+	return nil
+}
+
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	views.Render(w, "Home", nil)
+	db, _ := data.GetDatabaseHandle()
+
+	portRows, _ := db.Query(`select app_id, port from app_ports`)
+
+	usedPortMap := map[int64]string{}
+
+	for portRows.Next() {
+		var appId int64
+		var port string
+		portRows.Scan(&appId, &port)
+		if len(port) > 0 {
+			usedPortMap[appId] = port
+		}
+	}
+
+	if err := views.Render(w, "Home", struct {
+		UsedPorts map[int64]string
+	}{
+		UsedPorts: usedPortMap,
+	}); err != nil {
+		fmt.Fprintf(w, "failed to render page, please try again later")
+		log.Printf("failed with error: %v", err)
+		return
+	}
 }
 
 func appsHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +89,118 @@ func appsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func appDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+
+	id := r.PathValue("id")
+
+	idInt, _ := strconv.Atoi(id)
+
+	db, _ := data.GetDatabaseHandle()
+
+	data, err := apps.FindById(db, int64(idInt))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	ports, err := app_ports.FindByAppId(db, int64(idInt))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	domainData, err := domains.FindByAppId(db, id)
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("domainData: %v\n", domainData)
+
+	views.Render(w, "AppsDetails", struct {
+		App           apps.AppsWithIdentifier
+		Ports         app_ports.AppPortsWithIdentifier
+		PrimaryDomain domains.DomainsWithIdentifier
+	}{
+		App:           *data,
+		Ports:         *ports,
+		PrimaryDomain: *domainData,
+	})
+	return
+
+}
+
+func appDomainHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+
+	r.ParseForm()
+
+	domain := r.Form.Get("domain")
+
+	id := r.PathValue("id")
+	db, _ := data.GetDatabaseHandle()
+
+	var existingDomainId int64
+	rows, _ := db.Query(`select id from domains where app_id = ? limit 1`, id)
+	for rows.Next() {
+		rows.Scan(&existingDomainId)
+	}
+	rows.Close()
+
+	if existingDomainId > 0 {
+		_, err := db.Exec(`update domains set domain = ? where app_id = ?`, domain, id)
+		if err != nil {
+			log.Println("failed to update domain", err)
+		}
+	} else {
+		_, err := db.Exec(`insert into domains (domain,app_id) values (?,?)`, domain, id)
+		if err != nil {
+			log.Println("failed to insert domain", err)
+		}
+	}
+
+	http.Redirect(w, r, "/apps/"+id, http.StatusSeeOther)
+}
+
+func appDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		db, _ := data.GetDatabaseHandle()
+		id := r.PathValue("id")
+		idInt, _ := strconv.Atoi(id)
+
+		rolledBack := false
+		tx, _ := db.Begin()
+		_, err := tx.Exec(`delete from apps where id = ?`, idInt)
+		if err != nil {
+			log.Println(err)
+			tx.Rollback()
+			rolledBack = true
+		}
+		_, err = tx.Exec(`delete from app_ports where app_id = ?`, idInt)
+		if err != nil {
+			log.Println(err)
+			if !rolledBack {
+				tx.Rollback()
+				rolledBack = true
+			}
+		}
+
+		if !rolledBack {
+			tx.Commit()
+		}
+
+		http.Redirect(w, r, "/apps", http.StatusSeeOther)
+		return
+	}
+}
+
 func appsNewHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
@@ -71,16 +214,31 @@ func appsNewHandler(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		appName := r.Form.Get("name")
 		appType := r.Form.Get("type")
+		appPort := r.Form.Get("port")
 
 		appInstance := apps.New()
 		appInstance.Name = appName
 		appInstance.InstanceID = 1
 		appInstance.Type.Scan(appType)
 
-		if _, err := appInstance.Save(db); err != nil {
+		appRecord, err := appInstance.Save(db)
+
+		if err != nil {
 			log.Println(err)
 			http.Redirect(w, r, "/apps/new", http.StatusSeeOther)
 			return
+		}
+
+		if len(appPort) > 0 {
+			port := app_ports.New()
+			port.AppId = appRecord.ID
+			port.Port = appPort
+			_, err := port.Save(db)
+			if err != nil {
+				log.Println(err)
+				http.Redirect(w, r, "/apps/new", http.StatusSeeOther)
+				return
+			}
 		}
 
 		http.Redirect(w, r, "/apps", http.StatusSeeOther)
@@ -198,8 +356,13 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", homeHandler)
+
 	mux.HandleFunc("/apps", appsHandler)
 	mux.HandleFunc("/apps/new", appsNewHandler)
+	mux.HandleFunc("/apps/{id}", appDetailsHandler)
+	mux.HandleFunc("/apps/{id}/delete", appDeleteHandler)
+	mux.HandleFunc("/apps/{id}/domain", appDomainHandler)
+
 	mux.HandleFunc("/config/editor", configEditorHandler)
 	mux.HandleFunc("/fetch-config", fetchConfigHandler)
 	mux.HandleFunc("/upload-config", uploadConfigHandler)

@@ -1,31 +1,7 @@
 {{define "CommonStyles"}}
-<style>
-  :root {
-    --base: #ffffff;
-    --surface: #efefef;
-    --overlay: #adadad;
-
-    --text: #181819;
-    --subtle: #333333;
-    --muted: #555;
-  }
-
-  button,
-  .button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 0px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    background: var(--text);
-    color: var(--base) !important;
-  }
-
-  button:hover,
-  .button:hover {
-    cursor: pointer;
-    background-color: var(--subtle);
-  }
-</style>
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+/>
+<link href="https://unpkg.com/basscss@8.0.2/css/basscss.min.css" rel="stylesheet">
 {{end}}
