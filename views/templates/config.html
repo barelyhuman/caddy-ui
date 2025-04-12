@@ -100,7 +100,7 @@
             if (data.error) {
               alert(data.error);
             } else {
-              alert("Config saved successfully!");
+              alert(data.message);
             }
           })
           .catch((err) => alert("Error uploading config: " + err));

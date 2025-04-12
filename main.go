@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strconv"
 
+	"github.com/barelyhuman/caddy-ui/caddy"
 	"github.com/barelyhuman/caddy-ui/data"
 	"github.com/barelyhuman/caddy-ui/data/models/app_ports"
 	"github.com/barelyhuman/caddy-ui/data/models/apps"
@@ -19,14 +18,7 @@ import (
 	"github.com/joho/godotenv"
 
 	_ "github.com/mattn/go-sqlite3"
-
-	"github.com/barelyhuman/go/env"
 )
-
-func getCaddyURL(path string) (string, error) {
-	baseURL := env.Get("CADDY_URL", "http://localhost:2019")
-	return url.JoinPath(baseURL, path)
-}
 
 func configEditorHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
@@ -34,7 +26,6 @@ func configEditorHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SyncConfigForApp(appId int64) error {
-
 	return nil
 }
 
@@ -118,8 +109,6 @@ func appDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-
-	fmt.Printf("domainData: %v\n", domainData)
 
 	views.Render(w, "AppsDetails", struct {
 		App           apps.AppsWithIdentifier
@@ -259,35 +248,19 @@ func (e ResponseError) toJSONString() (string, error) {
 }
 
 func fetchConfigHandler(w http.ResponseWriter, r *http.Request) {
-	url, err := getCaddyURL("/config")
+	config, err := caddy.GetFullConfig()
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json, _ := ResponseError{
 			err: err,
 		}.toJSONString()
-
 		io.WriteString(w, json)
 		return
 	}
-	resp, err := http.Get(url)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadGateway)
-		json, _ := ResponseError{
-			err: err,
-		}.toJSONString()
-		io.WriteString(w, json)
-		return
-	}
-	defer resp.Body.Close()
-
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		log.Println("Error copying response:", err)
-	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(config)
 }
 
 func uploadConfigHandler(w http.ResponseWriter, r *http.Request) {
@@ -302,40 +275,36 @@ func uploadConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Read the config from the request body
 	configBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, `{"error": "Failed to read config from request, make sure a valid config was sent"}`)
+		return
+	}
 	defer r.Body.Close()
+	err = caddy.SaveConfig(configBytes)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, `{"error": "Failed to read config: `+err.Error()+`"}`)
+		jsonReponse, _ := ResponseError{
+			err: fmt.Errorf("failed to save config due to error: %v", err.Error()),
+		}.toJSONString()
+		io.WriteString(w, jsonReponse)
 		return
 	}
 
-	url, err := getCaddyURL("/load")
-	if err != nil {
-		http.Error(w, "Error creating config url: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Upload the config to the backend service
-	resp, err := http.Post(url, "application/json", bytes.NewReader(configBytes))
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, `{"error": "Error uploading config: `+err.Error()+`"}`)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Relay the response from the backend service
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		log.Println("Error copying response:", err)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusInternalServerError)
-	io.WriteString(w, `{"message": "Uploaded"}`)
+	jsonResponse, _ := ResponseJson{
+		"message": "Config saved successfully",
+	}.toJSONString()
+	io.WriteString(w, jsonResponse)
+}
+
+type ResponseJson map[string]interface{}
+
+func (e ResponseJson) toJSONString() (string, error) {
+	bytes, err := json.Marshal(e)
+	return string(bytes), err
 }
 
 func main() {
