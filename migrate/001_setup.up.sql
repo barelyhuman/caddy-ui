@@ -35,6 +35,7 @@ CREATE TABLE apps (
     name TEXT NOT NULL UNIQUE,
     instance_id INTEGER,
     type TEXT,
+    caddy_server_map TEXT,
 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

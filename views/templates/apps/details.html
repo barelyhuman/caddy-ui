@@ -1,7 +1,6 @@
 {{define "AppsDetails" }}
 <html>
   <head>
-    <script src="//unpkg.com/alpinejs" defer></script>
     {{template "CommonStyles" .}}
   </head>
   <body class="container-fluid">
@@ -28,17 +27,44 @@
         </fieldset>
       </form>
       <footer>
-        <div class="flex justify-end items-center" x-data="{}">
-          <button
-            type="button"
-            class="fit mr2"
-            x-on:click="alert('yet to be implemented sorry')"
-          >
-            Sync
-          </button>
+        <div class="flex justify-end items-center">
+          <button type="button" class="fit mr2" id="sync-button">Sync</button>
         </div>
       </footer>
     </article>
+
+    <script>
+      const button = document.querySelector("#sync-button");
+      const id = "{{.App.ID}}";
+
+      button.addEventListener("click", () => {
+        attemptSync();
+      });
+
+      async function attemptSync() {
+        button.setAttribute("disabled", true);
+        button.setAttribute("ariaLoading", true);
+        try {
+          const res = await fetch(`/apps/${id}/sync`, {
+            method: "post",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+
+          if (!res.ok) {
+            console.log(`error: ${await res.text()}`);
+            return alert("failed to sync due to some error");
+          }
+
+          return alert((await res.json()).message);
+        } finally {
+          button.removeAttribute("disabled");
+          button.removeAttribute("ariaLoading");
+        }
+      }
+    </script>
   </body>
 </html>
 {{end}}

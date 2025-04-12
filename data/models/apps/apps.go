@@ -55,15 +55,15 @@ func FindAll(db *sql.DB) ([]AppsWithIdentifier, error) {
 	return collection, nil
 }
 
-func FindById(db *sql.DB, id int64) (*AppsWithIdentifier, error) {
+func FindById(db *sql.DB, id string) (*AppsWithIdentifier, error) {
 	var x AppsWithIdentifier
 	res, err := db.Query(`
-		select id,name,instance_id,type,created_at,updated_at from apps
-	`)
-	defer res.Close()
+		select id,name,instance_id,type,created_at,updated_at from apps where id = ?
+	`, id)
 	if err != nil {
 		return &x, err
 	}
+	defer res.Close()
 
 	if res == nil {
 		return &x, nil

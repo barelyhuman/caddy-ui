@@ -25,7 +25,137 @@ func configEditorHandler(w http.ResponseWriter, r *http.Request) {
 	views.Render(w, "ConfigEditor", nil)
 }
 
-func SyncConfigForApp(appId int64) error {
+func SyncConfigForApp(appId string) error {
+	servers, err := caddy.GetServersConfig()
+	if err != nil {
+		return err
+	}
+
+	mappingsToModify := []string{}
+
+	// find mappings for :80 and :443
+	for k, v := range servers {
+		for _, port := range v.Listen {
+			if port == ":80" || port == ":443" {
+				mappingsToModify = append(mappingsToModify, k)
+			}
+		}
+	}
+
+	// if no mapping with ":443" exists, add a new mapping for it
+	found443 := false
+	for _, s := range servers {
+		for _, port := range s.Listen {
+			if port == ":443" {
+				found443 = true
+				break
+			}
+		}
+	}
+	if !found443 {
+		newMappingKey := "auto-443"
+		servers[newMappingKey] = caddy.Server{
+			Listen: []string{":443"},
+			Routes: []caddy.Route{},
+		}
+		mappingsToModify = append(mappingsToModify, newMappingKey)
+	}
+
+	fmt.Printf("mappingsToModify: %v\n", mappingsToModify)
+
+	// retrieve domain for the provided appId and add new route to mappings listening on ":443"
+	db, err := data.GetDatabaseHandle()
+	if err != nil {
+		return err
+	}
+	domainData, err := domains.FindByAppId(db, appId)
+	// app, err := apps.FindById(db, appId)
+
+	if err != nil {
+		return err
+	}
+
+	appPort, err := app_ports.FindByAppId(db, appId)
+
+	if err != nil {
+		return err
+	}
+
+	for _, mapping := range mappingsToModify {
+		hasNetworkListeners := false
+		for _, port := range servers[mapping].Listen {
+			if port == ":443" || port == ":80" {
+				hasNetworkListeners = true
+				break
+			}
+		}
+		if !hasNetworkListeners {
+			continue
+		}
+		desiredDial := "http://localhost:" + appPort.Port
+
+		newRoute := caddy.Route{
+			Match: []caddy.Match{
+				{
+					Host: []string{domainData.Domain},
+				},
+			},
+			Handle: []caddy.HandleDef{
+				{
+					Handler: "subroute",
+					Routes: []caddy.Route{
+						{
+							Handle: []caddy.HandleDef{
+								{
+									Handler:   "reverse_proxy",
+									Upstreams: []caddy.Upstream{{Dial: desiredDial}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		routeUpdated := false
+		currentServer := servers[mapping]
+		for i, existingRoute := range currentServer.Routes {
+			for j, handle := range existingRoute.Handle {
+				if handle.Handler == "subroute" && len(handle.Routes) > 0 {
+					for k, subRoute := range handle.Routes {
+						for l, subHandle := range subRoute.Handle {
+							if subHandle.Handler == "reverse_proxy" && len(subHandle.Upstreams) > 0 {
+								if subHandle.Upstreams[0].Dial != desiredDial {
+									currentServer.Routes[i].Handle[j].Routes[k].Handle[l].Upstreams[0].Dial = desiredDial
+								}
+								routeUpdated = true
+								break
+							}
+						}
+						if routeUpdated {
+							break
+						}
+					}
+				}
+				if routeUpdated {
+					break
+				}
+			}
+			if routeUpdated {
+				break
+			}
+		}
+		if !routeUpdated {
+			currentServer.Routes = append(currentServer.Routes, newRoute)
+		}
+		servers[mapping] = currentServer
+	}
+
+	fmt.Printf("servers: %v\n", servers)
+	if err := caddy.SaveServersConfig(servers); err != nil {
+		log.Println(err)
+	}
+
 	return nil
 }
 
@@ -90,16 +220,14 @@ func appDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := r.PathValue("id")
 
-	idInt, _ := strconv.Atoi(id)
-
 	db, _ := data.GetDatabaseHandle()
 
-	data, err := apps.FindById(db, int64(idInt))
+	data, err := apps.FindById(db, id)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	ports, err := app_ports.FindByAppId(db, int64(idInt))
+	ports, err := app_ports.FindByAppId(db, id)
 	if err != nil {
 		log.Println(err)
 		return
@@ -119,8 +247,22 @@ func appDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		Ports:         *ports,
 		PrimaryDomain: *domainData,
 	})
-	return
+}
 
+func syncConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	id := r.PathValue("id")
+
+	SyncConfigForApp(id)
+
+	jsonResponse, _ := ResponseJson{
+		"message": "Done",
+	}.toJSONString()
+
+	io.WriteString(w, jsonResponse)
 }
 
 func appDomainHandler(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +296,8 @@ func appDomainHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("failed to insert domain", err)
 		}
 	}
+
+	SyncConfigForApp(id)
 
 	http.Redirect(w, r, "/apps/"+id, http.StatusSeeOther)
 }
@@ -331,6 +475,7 @@ func main() {
 	mux.HandleFunc("/apps/{id}", appDetailsHandler)
 	mux.HandleFunc("/apps/{id}/delete", appDeleteHandler)
 	mux.HandleFunc("/apps/{id}/domain", appDomainHandler)
+	mux.HandleFunc("/apps/{id}/sync", syncConfigHandler)
 
 	mux.HandleFunc("/config/editor", configEditorHandler)
 	mux.HandleFunc("/fetch-config", fetchConfigHandler)

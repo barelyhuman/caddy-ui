@@ -2,26 +2,23 @@
   "apps": {
     "http": {
       "servers": {
-        // srv0, srv1 can be anything but easier to just use the incremented values
         "srv0": {
           "listen": [
-            ":443" // if https is required
+            ":443"
           ],
           "routes": [
             {
               "handle": [
                 {
-                  // handler will be a subroute handler if a domain is required
                   "handler": "subroute",
                   "routes": [
                     {
                       "handle": [
                         {
-                          // handler of the subroute will be a reverse_proxy
                           "handler": "reverse_proxy",
                           "upstreams": [
                             {
-                              "dial": "0.0.0.0:8081"
+                              "dial": "localhost:3002"
                             }
                           ]
                         }
@@ -32,9 +29,36 @@
               ],
               "match": [
                 {
-                  // this defines the matching param
                   "host": [
-                    // blog.reaper.is, // if both `blog.reaper.is, reaper.is` were added as a matcher
+                    "barelyhuman.dev"
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "localhost:3001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  "host": [
                     "reaper.is"
                   ]
                 }
@@ -51,14 +75,60 @@
             {
               "handle": [
                 {
-                  "handler": "reverse_proxy",
-                  "upstreams": [
+                  "handler": "subroute",
+                  "routes": [
                     {
-                      "dial": "0.0.0.0:8081"
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "localhost:3002"
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 }
-              ]
+              ],
+              "match": [
+                {
+                  "host": [
+                    "barelyhuman.dev"
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "localhost:3001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "reaper.is"
+                  ]
+                }
+              ],
+              "terminal": true
             }
           ]
         }

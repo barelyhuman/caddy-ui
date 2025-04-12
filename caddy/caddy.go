@@ -27,9 +27,43 @@ type AdminConfig struct {
 // tiny subset of the caddy config to avoid bundling the entire
 // caddy package as a dep
 type Config struct {
-	Admin *AdminConfig               `json:"admin,omitempty"`
-	Apps  map[string]json.RawMessage `json:"apps,omitempty"`
+	Admin *AdminConfig `json:"admin,omitempty"`
+	Apps  *AppConfig   `json:"apps,omitempty"`
 }
+
+type ListenAddresses []string
+
+type Upstream struct {
+	Dial string `json:"dial"`
+}
+
+type HandleDef struct {
+	Handler   string     `json:"handler,omitempty"`
+	Upstreams []Upstream `json:"upstreams,omitempty"`
+	Routes    []Route    `json:"routes,omitempty"`
+}
+type Match struct {
+	Host []string `json:"host,omitempty"`
+}
+
+type Route struct {
+	Handle   []HandleDef `json:"handle,omitempty"`
+	Match    []Match     `json:"match,omitempty"`
+	Terminal bool        `json:"terminal,omitempty"`
+}
+
+type Server struct {
+	Listen ListenAddresses `json:"listen,omitempty"`
+	Routes []Route         `json:"routes,omitempty"`
+}
+
+type AppConfig struct {
+	HTTP struct {
+		Servers ServersConfig `json:"servers,omitempty"`
+	} `json:"http,omitempty"`
+}
+
+type ServersConfig map[string]Server
 
 func SaveConfig(fullConfig []byte) error {
 	url, _ := getCaddyURL("/load")
@@ -52,6 +86,72 @@ func SaveConfig(fullConfig []byte) error {
 		}
 	}
 	return nil
+}
+
+func SaveServersConfig(config ServersConfig) error {
+	result, err := url.JoinPath("/config/apps/http/servers")
+	if err != nil {
+		return err
+	}
+	url, err := getCaddyURL(result)
+	if err != nil {
+		return err
+	}
+	value, _ := json.Marshal(config)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(
+		value,
+	))
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	v, _ := io.ReadAll(resp.Body)
+	fmt.Printf("v: %v\n", string(v))
+
+	return nil
+}
+
+func GetServersConfig() (ServersConfig, error) {
+	var config ServersConfig
+
+	result, err := url.JoinPath("/config/apps/http/servers")
+	if err != nil {
+		return config, err
+	}
+	url, err := getCaddyURL(result)
+	if err != nil {
+		return config, err
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return config, err
+	}
+	defer resp.Body.Close()
+
+	json.NewDecoder(resp.Body).Decode(&config)
+	return config, nil
+}
+
+func GetConfigAtPath(path string) (json.RawMessage, error) {
+	var config json.RawMessage
+
+	result, err := url.JoinPath("/config/", path)
+	if err != nil {
+		return config, err
+	}
+	url, err := getCaddyURL(result)
+	if err != nil {
+		return config, err
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return config, err
+	}
+	defer resp.Body.Close()
+
+	json.NewDecoder(resp.Body).Decode(&config)
+	return config, nil
 }
 
 func GetFullConfig() (Config, error) {

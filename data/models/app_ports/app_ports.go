@@ -25,12 +25,12 @@ func New() *AppPorts {
 	return &AppPorts{}
 }
 
-func DeleteByAppId(db *sql.DB, appId int64) error {
+func DeleteByAppId(db *sql.DB, appId string) error {
 	_, err := db.Exec("delete from app_ports where app_id = ?", appId)
 	return err
 }
 
-func FindByAppId(db *sql.DB, appId int64) (*AppPortsWithIdentifier, error) {
+func FindByAppId(db *sql.DB, appId string) (*AppPortsWithIdentifier, error) {
 	var record AppPortsWithIdentifier
 
 	cols, _ := scan.Columns(&record)
