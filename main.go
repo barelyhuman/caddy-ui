@@ -31,132 +31,128 @@ func SyncConfigForApp(appId string) error {
 		return err
 	}
 
-	mappingsToModify := []string{}
-
-	// find mappings for :80 and :443
-	for k, v := range servers {
-		for _, port := range v.Listen {
+	// Collect server keys that listen on :80 or :443.
+	mappings := []string{}
+	for key, server := range servers {
+		for _, port := range server.Listen {
 			if port == ":80" || port == ":443" {
-				mappingsToModify = append(mappingsToModify, k)
-			}
-		}
-	}
-
-	// if no mapping with ":443" exists, add a new mapping for it
-	found443 := false
-	for _, s := range servers {
-		for _, port := range s.Listen {
-			if port == ":443" {
-				found443 = true
+				// Remove default file_server handler for :80.
+				if port == ":80" {
+					for i, route := range server.Routes {
+						newHandles := []caddy.HandleDef{}
+						for _, h := range route.Handle {
+							// Skip the default file_server if no match criteria.
+							if h.Handler == "file_server" && len(route.Match) == 0 {
+								continue
+							}
+							newHandles = append(newHandles, h)
+						}
+						server.Routes[i].Handle = newHandles
+					}
+				}
+				mappings = append(mappings, key)
 				break
 			}
 		}
 	}
-	if !found443 {
-		newMappingKey := "auto-443"
-		servers[newMappingKey] = caddy.Server{
+
+	// Ensure at least one server listens on :443.
+	has443 := false
+	for _, srv := range servers {
+		for _, port := range srv.Listen {
+			if port == ":443" {
+				has443 = true
+				break
+			}
+		}
+		if has443 {
+			break
+		}
+	}
+	if !has443 {
+		key := "auto-443"
+		servers[key] = caddy.Server{
 			Listen: []string{":443"},
 			Routes: []caddy.Route{},
 		}
-		mappingsToModify = append(mappingsToModify, newMappingKey)
+		mappings = append(mappings, key)
 	}
 
-	fmt.Printf("mappingsToModify: %v\n", mappingsToModify)
-
-	// retrieve domain for the provided appId and add new route to mappings listening on ":443"
+	// Retrieve domain and port settings for the given app.
 	db, err := data.GetDatabaseHandle()
 	if err != nil {
 		return err
 	}
 	domainData, err := domains.FindByAppId(db, appId)
-	// app, err := apps.FindById(db, appId)
-
 	if err != nil {
 		return err
 	}
-
 	appPort, err := app_ports.FindByAppId(db, appId)
-
 	if err != nil {
 		return err
 	}
+	dialAddr := "127.0.0.1:" + appPort.Port
 
-	for _, mapping := range mappingsToModify {
-		hasNetworkListeners := false
-		for _, port := range servers[mapping].Listen {
-			if port == ":443" || port == ":80" {
-				hasNetworkListeners = true
+	// For each mapping, update an existing reverse_proxy route or add a new one.
+	for _, key := range mappings {
+		server := servers[key]
+		updated := false
+
+		for i, route := range server.Routes {
+			for j, handle := range route.Handle {
+				if handle.Handler != "subroute" || len(handle.Routes) == 0 {
+					continue
+				}
+				for k, subRoute := range handle.Routes {
+					for l, subHandle := range subRoute.Handle {
+						if subHandle.Handler == "reverse_proxy" && len(subHandle.Upstreams) > 0 {
+							if subHandle.Upstreams[0].Dial != dialAddr {
+								server.Routes[i].Handle[j].Routes[k].Handle[l].Upstreams[0].Dial = dialAddr
+							}
+							updated = true
+							break
+						}
+					}
+					if updated {
+						break
+					}
+				}
+				if updated {
+					break
+				}
+			}
+			if updated {
 				break
 			}
 		}
-		if !hasNetworkListeners {
-			continue
-		}
-		desiredDial := "http://localhost:" + appPort.Port
 
-		newRoute := caddy.Route{
-			Match: []caddy.Match{
-				{
-					Host: []string{domainData.Domain},
+		if !updated {
+			newRoute := caddy.Route{
+				Match: []caddy.Match{
+					{Host: []string{domainData.Domain}},
 				},
-			},
-			Handle: []caddy.HandleDef{
-				{
-					Handler: "subroute",
-					Routes: []caddy.Route{
-						{
-							Handle: []caddy.HandleDef{
-								{
-									Handler:   "reverse_proxy",
-									Upstreams: []caddy.Upstream{{Dial: desiredDial}},
+				Handle: []caddy.HandleDef{
+					{
+						Handler: "subroute",
+						Routes: []caddy.Route{
+							{
+								Handle: []caddy.HandleDef{
+									{
+										Handler:   "reverse_proxy",
+										Upstreams: []caddy.Upstream{{Dial: dialAddr}},
+									},
 								},
 							},
 						},
 					},
 				},
-			},
-		}
-
-		routeUpdated := false
-		currentServer := servers[mapping]
-		for i, existingRoute := range currentServer.Routes {
-			for j, handle := range existingRoute.Handle {
-				if handle.Handler == "subroute" && len(handle.Routes) > 0 {
-					for k, subRoute := range handle.Routes {
-						for l, subHandle := range subRoute.Handle {
-							if subHandle.Handler == "reverse_proxy" && len(subHandle.Upstreams) > 0 {
-								if subHandle.Upstreams[0].Dial != desiredDial {
-									currentServer.Routes[i].Handle[j].Routes[k].Handle[l].Upstreams[0].Dial = desiredDial
-								}
-								routeUpdated = true
-								break
-							}
-						}
-						if routeUpdated {
-							break
-						}
-					}
-				}
-				if routeUpdated {
-					break
-				}
 			}
-			if routeUpdated {
-				break
-			}
+			server.Routes = append(server.Routes, newRoute)
 		}
-		if !routeUpdated {
-			currentServer.Routes = append(currentServer.Routes, newRoute)
-		}
-		servers[mapping] = currentServer
+		servers[key] = server
 	}
 
-	fmt.Printf("servers: %v\n", servers)
-	if err := caddy.SaveServersConfig(servers); err != nil {
-		log.Println(err)
-	}
-
-	return nil
+	return caddy.SaveServersConfig(servers)
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -480,6 +476,11 @@ func main() {
 	mux.HandleFunc("/config/editor", configEditorHandler)
 	mux.HandleFunc("/fetch-config", fetchConfigHandler)
 	mux.HandleFunc("/upload-config", uploadConfigHandler)
+
+	allApps, _ := apps.FindAll(db)
+	for _, v := range allApps {
+		SyncConfigForApp(fmt.Sprintf("%v", v.ID))
+	}
 
 	log.Println("Listening on :8081")
 	if err := http.ListenAndServe(":8081", mux); err != nil {

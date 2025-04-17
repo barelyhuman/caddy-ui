@@ -1,11 +1,12 @@
 services:
   caddy:
     image: caddy:latest
-    ports:
-      - "2019:2019"
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+    network_mode: host
+    # ports:
+    #   - "2019:2019"
+    #   - "80:80"
+    #   - "443:443"
+    #   - "443:443/udp"
     environment:
       CADDY_ADMIN: "0.0.0.0:2019"
     # volumes:
@@ -21,4 +22,4 @@ services:
   #   environment:
   #     CADDY_URL: http://caddy:2019
   #   ports:
-  #     - "8081:8081"
+  #     - "3003:8081"
